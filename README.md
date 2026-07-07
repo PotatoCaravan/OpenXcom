@@ -1,3 +1,14 @@
+## What Is This Fork?
+Because I have a public facing YouTube channel and a discord server, I feel the
+need to leave a note here for anyone passing by. I've had a lot of questions about
+tweaks/changes that could be made to OpenXcom (Extended) here, and seeing as its
+open source, I finally decided to sit down and fork the repo. I have a
+number of different ideas, and each will be on their own separate branch. My first
+branch will be a limit test of claude code, may or may not continue testing past
+this weekend...
+
+---
+
 # OpenXcom [![Workflow Status][workflow-badge]][actions-url]
 
 [workflow-badge]: https://github.com/OpenXcom/OpenXcom/workflows/ci/badge.svg
