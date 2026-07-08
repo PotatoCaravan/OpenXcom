@@ -26,6 +26,7 @@
 #include "Engine/Game.h"
 #include "Engine/Options.h"
 #include "Engine/FileMap.h"
+#include "Engine/Verify.h" // [AI-MODS]
 #include "Menu/StartState.h"
 
 /** @mainpage
@@ -117,8 +118,14 @@ int main(int argc, char *argv[])
 	YAML::setGlobalErrorHandler();
 	CrossPlatform::getErrorDialog();
 	CrossPlatform::processArgs(argc, argv);
+	// [AI-MODS] headless self-tests run before options/assets are touched, then exit (0 = pass).
+	if (Verify::selfTestRequested())
+		return Verify::runSelfTests();
 	if (!Options::init())
 		return EXIT_SUCCESS;
+	// [AI-MODS] headless mod validation: folders/options are ready; load mods and exit, no window.
+	if (Verify::validateRequested())
+		return Verify::runModValidation();
 	std::ostringstream title;
 	title << "OpenXcom " << OPENXCOM_VERSION_SHORT << OPENXCOM_VERSION_GIT;
 	Options::baseXResolution = Options::displayWidth;

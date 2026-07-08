@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "permissions": {
+    "allow": [
+      "PowerShell(./scripts/build-check.ps1:*)",
+      "PowerShell(./scripts/run-selftest.ps1:*)",
+      "PowerShell(./scripts/validate-mods.ps1:*)",
+      "PowerShell(./scripts/setup-gamedata.ps1:*)",
+      "PowerShell(cmake:*)",
+      "Bash(cmake:*)"
+    ],
+    "ask": [
+      "Bash(git:*)",
+      "PowerShell(git:*)"
+    ]
+  }
+}

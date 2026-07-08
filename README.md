@@ -9,6 +9,37 @@ this weekend...
 
 ---
 
+## Claude Code test harness (this branch)
+
+This branch adds a small, self-contained testing + guidance harness so an AI assistant (Claude Code)
+can work in this repo safely and **prove** its changes. It does not change how the game plays.
+
+**Verify a change** — from the repo root, in PowerShell:
+
+- `./scripts/build-check.ps1` — compile gate (MSBuild, dependencies are vendored).
+- `./scripts/run-selftest.ps1` — headless engine self-tests (`OpenXcom.exe --selftest`).
+- `./scripts/validate-mods.ps1 -Master xcom1` — headless ruleset / Y-Script validation
+  (`OpenXcom.exe --validate`). Run `./scripts/setup-gamedata.ps1` once first to link your local
+  X-COM data in.
+
+**What's included**
+
+- `CLAUDE.md` — the operating guide (procedure, coding style, branch rules, safety).
+- `docs/BUILDING.md`, `docs/TESTING.md`, `docs/UPSTREAM_SYNC.md`.
+- Two new headless engine modes (`--selftest`, `--validate`) in `src/Engine/Verify.cpp`.
+- `.github/workflows/ci.yml` (build + self-test on Windows & Linux) and `.claude/` config.
+
+**Design notes**
+
+- Copyrighted X-COM game data is **never committed** — it stays outside the repo, is gitignored,
+  and a pre-commit hook blocks it.
+- Engine edits are kept minimal and tagged `// [AI-MODS]` so merges from upstream OXCE stay easy
+  (every touch-point is listed in `docs/UPSTREAM_SYNC.md`).
+
+See `CLAUDE.md` for the full guide.
+
+---
+
 # OpenXcom [![Workflow Status][workflow-badge]][actions-url]
 
 [workflow-badge]: https://github.com/OpenXcom/OpenXcom/workflows/ci/badge.svg

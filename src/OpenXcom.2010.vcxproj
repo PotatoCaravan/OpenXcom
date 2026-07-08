@@ -515,6 +515,7 @@
     <ClCompile Include="Engine\Timer.cpp" />
     <ClCompile Include="Engine\TouchState.cpp" />
     <ClCompile Include="Engine\Unicode.cpp" />
+    <ClCompile Include="Engine\Verify.cpp" />
     <ClCompile Include="Engine\Yaml.cpp" />
     <ClCompile Include="Engine\Zoom.cpp" />
     <ClCompile Include="Geoscape\AlienBaseState.cpp" />
@@ -1004,6 +1005,7 @@
     <ClInclude Include="Engine\Timer.h" />
     <ClInclude Include="Engine\TouchState.h" />
     <ClInclude Include="Engine\Unicode.h" />
+    <ClInclude Include="Engine\Verify.h" />
     <ClInclude Include="Engine\Yaml.h" />
     <ClInclude Include="Engine\Zoom.h" />
     <ClInclude Include="fallthrough.h" />

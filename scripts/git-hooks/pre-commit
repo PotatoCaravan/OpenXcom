@@ -1,0 +1,26 @@
+#!/bin/sh
+# [AI-MODS] pre-commit guard: never allow copyrighted X-COM game data or user saves into a commit,
+# even via `git add -f`. The real game data lives OUTSIDE the repo and is linked in by
+# scripts/setup-gamedata.ps1; only the bin/UFO/README.txt and bin/TFTD/README.txt placeholders are
+# tracked. Install with:  git config core.hooksPath scripts/git-hooks
+#
+# See CLAUDE.md ("Never commit game data").
+
+staged=$(git diff --cached --name-only)
+[ -z "$staged" ] && exit 0
+
+blocked=$(printf '%s\n' "$staged" \
+	| grep -E '^bin/(UFO|TFTD|user)/' \
+	| grep -vE '^bin/(UFO|TFTD)/README\.txt$')
+
+if [ -n "$blocked" ]; then
+	echo "pre-commit: BLOCKED - refusing to commit X-COM game data / user saves:" >&2
+	printf '%s\n' "$blocked" | sed 's/^/    /' >&2
+	echo "" >&2
+	echo "These files are copyrighted and must never be pushed to the public repo." >&2
+	echo "Unstage them, e.g.:  git reset HEAD <file>" >&2
+	echo "(Game data belongs outside the repo - see scripts/setup-gamedata.ps1 and CLAUDE.md.)" >&2
+	exit 1
+fi
+
+exit 0

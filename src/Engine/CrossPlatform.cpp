@@ -35,12 +35,17 @@
 #include "Exception.h"
 #include "Options.h"
 #include "Unicode.h"
+#include <cstdio>	// [AI-MODS] ensureConsoleOutput() stdout rewiring
+#include <cstdint>	// [AI-MODS] ensureConsoleOutput() intptr_t
+#include <iostream>	// [AI-MODS] ensureConsoleOutput() stream sync
 #ifdef _WIN32
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <io.h>		// [AI-MODS] _open_osfhandle for ensureConsoleOutput()
+#include <fcntl.h>	// [AI-MODS] _O_TEXT for ensureConsoleOutput()
 #include <shlobj.h>
 #include <shlwapi.h>
 #include <shellapi.h>
@@ -1603,6 +1608,48 @@ static const size_t LOG_BUFFER_LIMIT = 1<<10;
 static std::list<std::pair<int, std::string>> logBuffer;
 static std::string logFileName;
 const std::string& getLogFileName() { return logFileName; }
+// [AI-MODS] running count of error-level (or worse) log messages; read by Verify --validate.
+static int logErrorCount = 0;
+int getLogErrorCount() { return logErrorCount; }
+
+/**
+ * [AI-MODS] Reconnects stdout so the headless verification modes (--selftest / --validate) can
+ * print to a console or a redirected file. On a /SUBSYSTEM:WINDOWS build the UCRT leaves the
+ * standard streams unconnected, so std::cout would otherwise be silently discarded. Console
+ * (Debug) builds and non-Windows platforms already have a valid stdout and are left untouched.
+ */
+void ensureConsoleOutput()
+{
+#ifdef _WIN32
+	if (_fileno(stdout) >= 0)
+	{
+		return; // already usable (console build, redirected console app, or already wired)
+	}
+	HANDLE h = GetStdHandle(STD_OUTPUT_HANDLE);
+	if ((h == NULL || h == INVALID_HANDLE_VALUE) && AttachConsole(ATTACH_PARENT_PROCESS))
+	{
+		h = GetStdHandle(STD_OUTPUT_HANDLE);
+	}
+	if (h == NULL || h == INVALID_HANDLE_VALUE)
+	{
+		return;
+	}
+	int fd = _open_osfhandle(reinterpret_cast<intptr_t>(h), _O_TEXT);
+	if (fd == -1)
+	{
+		return;
+	}
+	FILE* f = _fdopen(fd, "w");
+	if (!f)
+	{
+		return;
+	}
+	*stdout = *f;
+	setvbuf(stdout, nullptr, _IONBF, 0);
+	std::ios::sync_with_stdio(true);
+	std::cout.clear();
+#endif
+}
 
 /**
  * Setting the log file name and setting the effective reportingLevel
@@ -1616,6 +1663,7 @@ void setLogFileName(const std::string& name) {
 	logFileName = name;
 }
 void log(int level, const std::ostringstream& baremsgstream) {
+	if (level <= LOG_ERROR) { ++logErrorCount; } // [AI-MODS] track errors for --validate
 	std::ostringstream msgstream;
 	msgstream << "[" << CrossPlatform::now() << "]" << "\t"
 			  << "[" << Logger::toString(level) << "]" << "\t"

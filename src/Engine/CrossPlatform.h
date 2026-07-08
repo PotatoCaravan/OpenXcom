@@ -263,6 +263,10 @@ namespace CrossPlatform
 	bool openExplorer(const std::string &url);
 	/// Log something.
 	void log(int, const std::ostringstream& msg);
+	/// [AI-MODS] Running count of error-level (or worse) log messages; read by --validate.
+	int getLogErrorCount();
+	/// [AI-MODS] Reconnects stdout for headless output on GUI (/SUBSYSTEM:WINDOWS) builds.
+	void ensureConsoleOutput();
 	/// The log file name
 	void setLogFileName(const std::string &path);
 	const std::string& getLogFileName();

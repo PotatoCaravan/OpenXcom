@@ -674,6 +674,12 @@ static void loadArgs()
 				_loadLastSave = true;
 				continue;
 			}
+			// [AI-MODS] headless verification flags take no value; handled in main(), skip here
+			// so they don't consume the following argument (e.g. "-validate -master xcom1").
+			if (argname == "selftest" || argname == "validate")
+			{
+				continue;
+			}
 			if (argv.size() > i + 1)
 			{
 				++i; // we'll be consuming the next argument too
@@ -746,6 +752,11 @@ static bool showHelp()
 	help << "        load last save" << std::endl << std::endl;
 	help << "-load FILENAME" << std::endl;
 	help << "        load the specified FILENAME (from the corresponding master mod subfolder)" << std::endl << std::endl;
+	// [AI-MODS] headless verification flags
+	help << "-selftest" << std::endl;
+	help << "        run headless engine self-tests and exit (exit code 0 = all passed)" << std::endl << std::endl;
+	help << "-validate" << std::endl;
+	help << "        load the active mods with strict validation and exit (exit code 0 = clean)" << std::endl << std::endl;
 	help << "-version" << std::endl;
 	help << "        show version number" << std::endl << std::endl;
 	help << "-help" << std::endl;

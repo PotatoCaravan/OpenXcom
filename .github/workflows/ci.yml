@@ -1,0 +1,47 @@
+name: CI
+
+# Build + headless self-tests on every push / PR. Rung 3 (--validate) is NOT run here because it
+# needs copyrighted X-COM game data the runners can't have; run it locally (see docs/TESTING.md).
+# Uses free GitHub-hosted runners (public repos get unlimited standard minutes).
+
+on:
+  push:
+    branches: [claude, oxce-plus]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  windows:
+    name: Windows — build + self-test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build (Release | x64)
+        shell: pwsh
+        run: ./scripts/build-check.ps1 -Configuration Release -Platform x64
+
+      - name: Self-tests
+        shell: pwsh
+        run: ./scripts/run-selftest.ps1 -NoBuild
+
+  linux:
+    name: Linux — build + self-test
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install SDL 1.2 dev packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libsdl1.2-dev libsdl-mixer1.2-dev libsdl-image1.2-dev libsdl-gfx1.2-dev zlib1g-dev
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Self-tests
+        run: ./build/bin/openxcom --selftest
