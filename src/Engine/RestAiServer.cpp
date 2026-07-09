@@ -152,6 +152,8 @@ struct ServerState
 	std::string requestYaml;
 	bool hasAction = false;
 	std::string actionYaml;
+	std::string lastActionYaml; // harness mode: most recent action body, for GET /last-action
+	bool hasLastAction = false;
 };
 
 /// Meyers singleton -> no static-init-order issues; lives for the whole process.
@@ -161,7 +163,33 @@ ServerState& S()
 	return s;
 }
 
-void registerHandlers(httplib::Server& svr)
+/// A representative v1 request payload (matches writeRequest's schema). Handy for developing a
+/// webserver against the standalone server, and served at GET /sample-request in harness mode.
+const char* sampleRequestYaml()
+{
+	return
+		"request:\n"
+		"  turn: 3\n"
+		"  side: HOSTILE\n"
+		"  difficulty: 2\n"
+		"  map: {sizeX: 60, sizeY: 60, sizeZ: 4}\n"
+		"  unit:\n"
+		"    id: 1000123\n"
+		"    type: STR_SECTOID_SOLDIER\n"
+		"    position: {x: 10, y: 12, z: 1}\n"
+		"    direction: 4\n"
+		"    tu: 54\n"
+		"    energy: 60\n"
+		"    health: 30\n"
+		"    kneeling: false\n"
+		"    items:\n"
+		"      - {id: 2001, type: STR_PLASMA_RIFLE, slot: STR_RIGHT_HAND, ammo: 20}\n"
+		"      - {id: 2002, type: STR_ALIEN_GRENADE, slot: STR_BELT}\n"
+		"  visibleEnemies:\n"
+		"    - {id: 500, type: STR_SOLDIER, faction: PLAYER, position: {x: 8, y: 9, z: 1}}\n";
+}
+
+void registerHandlers(httplib::Server& svr, bool harness)
 {
 	// Liveness probe for the external webserver.
 	svr.Get("/health", [](const httplib::Request&, httplib::Response& res)
@@ -192,6 +220,8 @@ void registerHandlers(httplib::Server& svr)
 			std::lock_guard<std::mutex> lk(s.mx);
 			s.actionYaml = req.body;
 			s.hasAction = true;
+			s.lastActionYaml = req.body;
+			s.hasLastAction = true;
 		}
 		s.cv.notify_all();
 		res.set_content("{\"status\":\"accepted\"}", "application/json");
@@ -203,6 +233,82 @@ void registerHandlers(httplib::Server& svr)
 		S().shutdownReq = true;
 		res.set_content("{\"status\":\"shutting-down\"}", "application/json");
 	});
+
+	if (!harness)
+	{
+		return;
+	}
+
+	// --- mock-harness endpoints (standalone --restserver only) ---
+	// They let a client simulate the engine side of the exchange without a live battle, so a
+	// webserver can be developed/integration-tested against a real engine build. Deliberately not
+	// registered during interactive play so they can't interfere with a real battle's exchange.
+
+	// Inject a pending decision (as if the engine were waiting on one).
+	svr.Post("/publish", [](const httplib::Request& req, httplib::Response& res)
+	{
+		RestAiServer::publishRequest(req.body);
+		res.set_content("{\"status\":\"published\"}", "application/json");
+	});
+
+	// Read back the most recently submitted action (for verifying a round trip).
+	svr.Get("/last-action", [](const httplib::Request&, httplib::Response& res)
+	{
+		ServerState& s = S();
+		std::lock_guard<std::mutex> lk(s.mx);
+		if (s.hasLastAction)
+		{
+			res.set_content(s.lastActionYaml, "application/x-yaml");
+		}
+		else
+		{
+			res.status = 204;
+		}
+	});
+
+	// A representative request payload, so a webserver author can see the exact schema.
+	svr.Get("/sample-request", [](const httplib::Request&, httplib::Response& res)
+	{
+		res.set_content(sampleRequestYaml(), "application/x-yaml");
+	});
+}
+
+/// Shared server bring-up. `harness` also exposes the mock endpoints (standalone mode only).
+int startImpl(int port, bool harness)
+{
+	ServerState& s = S();
+	if (s.running)
+	{
+		return s.boundPort;
+	}
+
+	s.svr.reset(new httplib::Server());
+	registerHandlers(*s.svr, harness);
+
+	int bound;
+	if (port == 0)
+	{
+		bound = s.svr->bind_to_any_port("0.0.0.0");
+	}
+	else
+	{
+		bound = s.svr->bind_to_port("0.0.0.0", port) ? port : -1;
+	}
+	if (bound <= 0)
+	{
+		Log(LOG_ERROR) << "[restai] failed to bind HTTP server to port " << port;
+		s.svr.reset();
+		return -1;
+	}
+
+	s.boundPort = bound;
+	s.running = true;
+	s.shutdownReq = false;
+	httplib::Server* p = s.svr.get();
+	s.thread = std::thread([p]() { p->listen_after_bind(); });
+	Log(LOG_INFO) << "[restai] REST server listening on http://0.0.0.0:" << bound
+				  << (harness ? " (mock-harness endpoints enabled)" : "");
+	return bound;
 }
 
 // ---------------------------------------------------------------------------
@@ -521,38 +627,7 @@ int timeoutMs()
 
 int start(int port)
 {
-	ServerState& s = S();
-	if (s.running)
-	{
-		return s.boundPort;
-	}
-
-	s.svr.reset(new httplib::Server());
-	registerHandlers(*s.svr);
-
-	int bound;
-	if (port == 0)
-	{
-		bound = s.svr->bind_to_any_port("0.0.0.0");
-	}
-	else
-	{
-		bound = s.svr->bind_to_port("0.0.0.0", port) ? port : -1;
-	}
-	if (bound <= 0)
-	{
-		Log(LOG_ERROR) << "[restai] failed to bind HTTP server to port " << port;
-		s.svr.reset();
-		return -1;
-	}
-
-	s.boundPort = bound;
-	s.running = true;
-	s.shutdownReq = false;
-	httplib::Server* p = s.svr.get();
-	s.thread = std::thread([p]() { p->listen_after_bind(); });
-	Log(LOG_INFO) << "[restai] REST AI server listening on http://0.0.0.0:" << bound;
-	return bound;
+	return startImpl(port, false); // interactive play: no mock-harness endpoints
 }
 
 int start()
@@ -684,7 +759,7 @@ bool decide(BattlescapeGame* game, BattleUnit* unit, BattleAction* out)
 int runServerMode()
 {
 	CrossPlatform::ensureConsoleOutput();
-	const int port = start(configuredPort());
+	const int port = startImpl(configuredPort(), true); // standalone: expose mock-harness endpoints
 	if (port <= 0)
 	{
 		Log(LOG_ERROR) << "[restserver] could not start the REST server on port " << configuredPort();
@@ -837,6 +912,37 @@ OXC_SELFTEST(restai_action_parse)
 		const ParsedAction pa = parseActionYaml("something: else\n");
 		ctx.check(pa.type == BA_NONE, "missing action node -> none");
 	}
+	{
+		// A raw enum int for type, and unknown fields, are tolerated.
+		const std::string y =
+			"action:\n"
+			"  type: 2\n"                 // BA_WALK
+			"  target: {x: 1, y: 1, z: 0}\n"
+			"  somethingUnknown: 42\n";
+		const ParsedAction pa = parseActionYaml(y);
+		ctx.check(pa.type == BA_WALK, "numeric type 2 -> WALK");
+		ctx.check(pa.hasTarget && pa.target.x == 1, "numeric-type action still has target");
+	}
+}
+
+OXC_SELFTEST(restai_sample_request)
+{
+	// The payload we serve at GET /sample-request must be valid YAML with the documented shape.
+	YAML::YamlRootNodeReader r(YAML::YamlString(sampleRequestYaml()), "sample");
+	YAML::YamlNodeReader req = r["request"];
+	ctx.check((bool)req, "sample has a request node");
+
+	int turn = -1;
+	ctx.check(req.tryRead("turn", turn) && turn == 3, "sample turn == 3");
+	std::string side;
+	ctx.check(req.tryRead("side", side) && side == "HOSTILE", "sample side == HOSTILE");
+
+	YAML::YamlNodeReader unit = req["unit"];
+	ctx.check((bool)unit, "sample has a unit node");
+	int id = 0;
+	ctx.check(unit.tryRead("id", id) && id == 1000123, "sample unit id");
+	YAML::YamlNodeReader items = unit["items"];
+	ctx.check(items && items.isSeq() && items.childrenCount() == 2, "sample has two items");
 }
 
 }

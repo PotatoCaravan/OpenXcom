@@ -65,6 +65,19 @@ action the main thread pumps `SDL_PumpEvents()` so the window stays responsive.
 Content type is `application/x-yaml`. `GET /state` and `POST /start-battle` are reserved for a
 later iteration (see *Limitations*).
 
+**Mock-harness endpoints** (standalone `--restserver` only — not exposed during interactive play,
+so they can't interfere with a real battle's exchange). They let you develop and integration-test a
+webserver against a real engine build without a live battle:
+
+| Method + path | Purpose |
+|---------------|---------|
+| `POST /publish` | Inject a pending decision (body = request YAML), as if the engine were waiting on one. |
+| `GET /last-action` | Read back the most recently submitted action (to verify a round trip). |
+| `GET /sample-request` | A representative request payload, so you can see the exact schema. |
+
+A full cross-process round trip is therefore: `POST /publish` → `GET /pending-decision` (returns it)
+→ `POST /action` → `GET /last-action` (echoes it). `scripts/run-restai.ps1` exercises exactly this.
+
 ### Request payload (`GET /pending-decision`)
 
 A curated, compact view (not a raw save dump), v1:
