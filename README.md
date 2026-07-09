@@ -38,6 +38,14 @@ can work in this repo safely and **prove** its changes. It does not change how t
 
 See `CLAUDE.md` for the full guide.
 
+### `rest-ai-server` branch — REST-controlled alien AI
+
+This branch replaces the alien battlescape AI with a hook to an **external webserver over REST**:
+the engine embeds a small HTTP server (via vendored cpp-httplib) and, when launched with `--restai`,
+asks the webserver what each alien should do instead of running the built-in `AIModule` (which
+stays as a fallback). Run the standalone server with `./scripts/run-restai.ps1` or `OpenXcom.exe
+--restserver`. Full endpoint/schema docs: `docs/REST_AI.md`.
+
 ---
 
 # OpenXcom [![Workflow Status][workflow-badge]][actions-url]

@@ -674,9 +674,12 @@ static void loadArgs()
 				_loadLastSave = true;
 				continue;
 			}
-			// [AI-MODS] headless verification flags take no value; handled in main(), skip here
-			// so they don't consume the following argument (e.g. "-validate -master xcom1").
-			if (argname == "selftest" || argname == "validate")
+			// [AI-MODS] headless verification / REST flags take no value; handled in main() and
+			// RestAiServer, skip here so they don't consume the following argument (e.g.
+			// "-validate -master xcom1" or "-restai -restai-port 8765"). Value-carrying flags like
+			// -restai-port / -restai-timeout fall through and are stored in _commandLine as usual.
+			if (argname == "selftest" || argname == "validate" ||
+				argname == "restai" || argname == "restserver" || argname == "autobattle")
 			{
 				continue;
 			}
@@ -790,6 +793,15 @@ static bool showHelp()
 				return true;
 			}
 			if (argname == "cont" || argname == "continue")
+			{
+				continue;
+			}
+			// [AI-MODS] valueless flags must not consume the following argument here either (this
+			// scan is separate from loadArgs()); otherwise e.g. "--restserver --restai-port 8791"
+			// leaves "8791" looking like an unknown parameter and aborts startup. Keep in sync with
+			// the matching skip block in loadArgs().
+			if (argname == "selftest" || argname == "validate" ||
+				argname == "restai" || argname == "restserver" || argname == "autobattle")
 			{
 				continue;
 			}

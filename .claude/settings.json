@@ -6,6 +6,7 @@
       "PowerShell(./scripts/run-selftest.ps1:*)",
       "PowerShell(./scripts/validate-mods.ps1:*)",
       "PowerShell(./scripts/setup-gamedata.ps1:*)",
+      "PowerShell(./scripts/run-restai.ps1:*)",
       "PowerShell(cmake:*)",
       "Bash(cmake:*)"
     ],

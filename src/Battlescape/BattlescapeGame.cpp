@@ -34,6 +34,7 @@
 #include "UnitDieBState.h"
 #include "UnitPanicBState.h"
 #include "AIModule.h"
+#include "../Engine/RestAiServer.h" // [AI-MODS] REST-controlled alien AI (see docs/REST_AI.md)
 #include "Pathfinding.h"
 #include "../Mod/AlienDeployment.h"
 #include "../Engine/Game.h"
@@ -361,7 +362,13 @@ void BattlescapeGame::handleAI(BattleUnit *unit)
 	BattleAction action;
 	action.actor = unit;
 	action.number = _AIActionCounter;
-	unit->think(&action);
+	// [AI-MODS] REST-controlled AI: when --restai is active, obtain this unit's decision from the
+	// external webserver instead of the built-in AIModule. On disabled / timeout / error, fall
+	// through to unit->think() so the game never hangs and normal play is unaffected.
+	if (!RestAiServer::enabled() || !RestAiServer::decide(this, unit, &action))
+	{
+		unit->think(&action);
+	}
 
 	if (action.type == BA_RETHINK)
 	{

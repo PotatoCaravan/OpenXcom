@@ -176,6 +176,7 @@ set ( engine_src
   Engine/Timer.cpp
   Engine/TouchState.cpp
   Engine/Unicode.cpp
+  Engine/RestAiServer.cpp
   Engine/Verify.cpp
   Engine/Yaml.cpp
   Engine/Zoom.cpp

@@ -27,6 +27,7 @@
 #include "Engine/Options.h"
 #include "Engine/FileMap.h"
 #include "Engine/Verify.h" // [AI-MODS]
+#include "Engine/RestAiServer.h" // [AI-MODS]
 #include "Menu/StartState.h"
 
 /** @mainpage
@@ -126,6 +127,9 @@ int main(int argc, char *argv[])
 	// [AI-MODS] headless mod validation: folders/options are ready; load mods and exit, no window.
 	if (Verify::validateRequested())
 		return Verify::runModValidation();
+	// [AI-MODS] headless REST server: run the alien-AI endpoint standalone (no window / game data).
+	if (RestAiServer::serverModeRequested())
+		return RestAiServer::runServerMode();
 	std::ostringstream title;
 	title << "OpenXcom " << OPENXCOM_VERSION_SHORT << OPENXCOM_VERSION_GIT;
 	Options::baseXResolution = Options::displayWidth;
@@ -133,8 +137,14 @@ int main(int argc, char *argv[])
 
 	game = new Game(title.str());
 	State::setGamePtr(game);
+	// [AI-MODS] REST-controlled alien AI: bring the HTTP server up for the whole session so the
+	// external webserver can drive aliens during battles (see BattlescapeGame::handleAI).
+	if (RestAiServer::enabled())
+		RestAiServer::start();
 	game->setState(new StartState);
 	game->run();
+
+	RestAiServer::stop(); // [AI-MODS] no-op unless the server was started
 
 	bool startUpdate = game->getUpdateFlag();
 

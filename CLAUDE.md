@@ -102,7 +102,7 @@ Enforced by `.clang-format`, `.editorconfig`, `.astylerc`; canonical reference:
 | `bin/UFO/`, `bin/TFTD/` | Game-data folders. Only `README.txt` is tracked; real assets are linked in by `setup-gamedata.ps1` and gitignored. |
 | `deps/`, `libs/` | Vendored dependencies (prebuilt SDL under `deps/`; `rapidyaml` + `miniz` sources under `libs/`). |
 | `scripts/` | The verification suite (PowerShell) + the `git-hooks/` pre-commit guard. |
-| `docs/` | `BUILDING.md`, `TESTING.md`, `UPSTREAM_SYNC.md`, plus Doxygen config. |
+| `docs/` | `BUILDING.md`, `TESTING.md`, `UPSTREAM_SYNC.md`, `REST_AI.md` (the `rest-ai-server` branch's REST-controlled alien AI), plus Doxygen config. |
 | `.github/workflows/` | CI (`ci.yml`). The old `nightly.test` is dormant. |
 
 ---

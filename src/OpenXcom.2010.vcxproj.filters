@@ -62,6 +62,9 @@
     <ClCompile Include="Engine\Screen.cpp">
       <Filter>Engine</Filter>
     </ClCompile>
+    <ClCompile Include="Engine\RestAiServer.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
     <ClCompile Include="Engine\Verify.cpp">
       <Filter>Engine</Filter>
     </ClCompile>
@@ -1296,6 +1299,9 @@
       <Filter>Engine</Filter>
     </ClInclude>
     <ClInclude Include="Engine\Screen.h">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\RestAiServer.h">
       <Filter>Engine</Filter>
     </ClInclude>
     <ClInclude Include="Engine\Verify.h">

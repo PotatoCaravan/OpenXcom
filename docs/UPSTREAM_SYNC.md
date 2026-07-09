@@ -71,6 +71,39 @@ git grep -n "\[AI-MODS\]" -- src/
 - `scripts/` (verification suite + `git-hooks/pre-commit`)
 - `.claude/` (harness config), `.github/workflows/ci.yml`
 
+## `rest-ai-server` branch touch-points (REST-controlled alien AI)
+
+This branch (forked off `claude`) adds an embedded HTTP server that lets an external webserver drive
+the alien AI. See `docs/REST_AI.md`. It is deliberately built so almost everything lives in new
+files; the only gameplay edit is a single hook.
+
+### New files (never conflict)
+
+- `libs/httplib/httplib.h` (+ `LICENSE`, `README.txt`) — vendored cpp-httplib v0.49.0 (MIT). Plain
+  HTTP only (no OpenSSL). On MSVC it self-links `ws2_32` via `#pragma comment(lib,...)`, so no build
+  linker edits are needed. Included **only** from `RestAiServer.cpp`, via a relative path, so no
+  include-dir edits are needed either.
+- `src/Engine/RestAiServer.h`, `src/Engine/RestAiServer.cpp` — the whole REST module (server thread,
+  decision exchange, YAML (de)serialization, the `--restserver` headless mode, and its self-tests).
+- `scripts/run-restai.ps1`, `scripts/mock-brain.py` — the smoke tooling.
+
+### Edited upstream files (small, marked)
+
+| File | Change |
+|------|--------|
+| `src/Battlescape/BattlescapeGame.cpp` | `#include "../Engine/RestAiServer.h"`; **the one gameplay hook** — in `handleAI()`, `unit->think(&action)` is wrapped so REST provides the decision when enabled, else it falls through to the built-in AI. |
+| `src/main.cpp` | `#include "Engine/RestAiServer.h"`; a `--restserver` branch after the `--validate` branch; start/stop of the server around `game->run()` when `--restai` is set. |
+| `src/Engine/Options.cpp` | `loadArgs()` valueless-flag skip list extended with `restai`/`restserver`/`autobattle`. |
+
+### Build source lists (add the new pair in all three)
+
+- `src/CMakeLists.txt` — `Engine/RestAiServer.cpp` in `engine_src`.
+- `src/OpenXcom.2010.vcxproj` — `<ClCompile Include="Engine\RestAiServer.cpp" />` + `<ClInclude Include="Engine\RestAiServer.h" />`.
+- `src/OpenXcom.2010.vcxproj.filters` — the same two entries under `<Filter>Engine</Filter>`.
+
+If upstream reworks `BattlescapeGame::handleAI`, re-apply the one wrapper around `unit->think(&action)`
+— the REST module itself never conflicts.
+
 ## Conflict guidance
 
 If upstream reworks the top of `main()`, `loadArgs`/`showHelp`, or the `CrossPlatform::log` area,
