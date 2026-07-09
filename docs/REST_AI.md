@@ -11,6 +11,9 @@ all the intelligence lives in your webserver.
 Everything here is a fork addition, tagged `// [AI-MODS]`; see `docs/UPSTREAM_SYNC.md` for the
 exact touch-points.
 
+> **Want an LLM to play the aliens against a human?** See `mcp-server/README.md` — a
+> dependency-free MCP server that wraps this API so a model (e.g. Claude) drives the alien turn.
+
 ---
 
 ## How it hooks in

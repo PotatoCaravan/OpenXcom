@@ -1,0 +1,3 @@
+# [AI-MODS] Python bytecode caches from running the MCP server / its tests.
+__pycache__/
+*.pyc
