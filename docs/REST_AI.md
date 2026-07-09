@@ -63,7 +63,13 @@ action the main thread pumps `SDL_PumpEvents()` so the window stays responsive.
 | `GET /health` | Liveness probe. | `200` `{"status":"ok"}` |
 | `GET /pending-decision` | The decision the engine is currently waiting on (request YAML), or nothing. | `200` + YAML, or `204` when idle |
 | `POST /action` | Submit the chosen action (action YAML in the body); unblocks the waiting alien. | `200` `{"status":"accepted"}` |
+| `GET /map` | **Live query** about the alien currently being decided: reachable tiles (+ count), nearby units, hazards. | `200` + YAML, or `409` when no decision is active |
+| `POST /validate` | **Live query**: is the proposed action (action YAML body) legal, and what does it cost? | `200` + YAML, or `409` when no decision is active |
 | `POST /shutdown` | Ask a standalone `--restserver` process to exit. | `200` `{"status":"shutting-down"}` |
+
+`/map` and `/validate` are answered by the engine's **main thread** from live game state (pathfinding,
+line-of-fire), so they only work **while an alien decision is active** (i.e. between a
+`GET /pending-decision` and the matching `POST /action`); otherwise they return `409`.
 
 Content type is `application/x-yaml`. `GET /state` and `POST /start-battle` are reserved for a
 later iteration (see *Limitations*).
@@ -125,6 +131,35 @@ action:
 - Robustness: malformed YAML, a missing `action` node, or an attack with no usable weapon all
   degrade safely to an idle (`NONE`) action — the engine will not crash on bad input.
 - `NONE` makes the alien idle (ends its activation), which is the simplest valid answer.
+
+### Live-query payloads
+
+`GET /map` response — what the current alien can do spatially:
+```yaml
+map:
+  unit: {id: 1000123, position: {x: 10, y: 12, z: 1}, tu: 54, energy: 60}
+  reachable:                    # where the unit can walk THIS turn
+    count: 137
+    truncated: false            # true if the tile list was capped (count is still exact)
+    tiles: [{x: 10, y: 11, z: 1}, {x: 9, y: 12, z: 1}]
+  nearbyUnits:                  # allies + enemies within ~12 tiles
+    - {id: 500, type: STR_SOLDIER, faction: PLAYER, position: {x: 8, y: 9, z: 1}, distance: 4}
+  hazards:
+    - {x: 11, y: 12, z: 1, smoke: 6}
+```
+
+`POST /validate` (body = an action YAML, same shape as `/action`) response:
+```yaml
+validation:
+  type: SNAPSHOT
+  target: {x: 8, y: 9, z: 1}
+  valid: true
+  reason: clear shot            # or "no line of fire" / "not enough TU" / "no path to target" / ...
+  tuAvailable: 54
+  tuCost: 18
+```
+Checks: `WALK` → reachability + TU cost; `SNAPSHOT`/`AUTOSHOT`/`AIMEDSHOT` → TU + line-of-fire to a
+unit on the target tile; `THROW` → TU + throw trajectory; other types → TU affordability only.
 
 ---
 

@@ -89,7 +89,8 @@ def main():
         send(proc, {"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
         r = recv(proc)
         names = {t["name"] for t in r["result"]["tools"]} if r else set()
-        expected = {"game_status", "wait_for_alien_decision", "submit_alien_action", "get_sample_request"}
+        expected = {"game_status", "wait_for_alien_decision", "submit_alien_action",
+                    "get_sample_request", "get_visible_map", "check_action"}
         check(names == expected, "tools/list exposes the expected tools")
 
         # tools/call wait_for_alien_decision -> should return the published request (marker present)
@@ -108,6 +109,21 @@ def main():
         text = r["result"]["content"][0]["text"] if r else ""
         check(r and r["result"]["isError"] is False and "accepted" in text,
               "submit_alien_action accepted by the engine")
+
+        # get_visible_map / check_action need an active alien decision; standalone mock mode has
+        # none, so they must return the "no alien decision" guidance (409 under the hood).
+        send(proc, {"jsonrpc": "2.0", "id": 6, "method": "tools/call",
+                    "params": {"name": "get_visible_map", "arguments": {}}})
+        r = recv(proc)
+        text = r["result"]["content"][0]["text"] if r else ""
+        check("No alien decision" in text, "get_visible_map guards when no decision is active")
+
+        send(proc, {"jsonrpc": "2.0", "id": 7, "method": "tools/call",
+                    "params": {"name": "check_action",
+                               "arguments": {"action_type": "WALK", "target_x": 5, "target_y": 5, "target_z": 0}}})
+        r = recv(proc)
+        text = r["result"]["content"][0]["text"] if r else ""
+        check("No alien decision" in text, "check_action guards when no decision is active")
 
         # 3. Confirm the action actually reached the engine (via the harness /last-action).
         la_status, la_body = client.last_action()

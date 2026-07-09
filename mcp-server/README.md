@@ -18,6 +18,8 @@ alien-AI API (the `rest-ai-server` branch).
 |------|--------------|
 | `game_status` | Is the engine reachable, and is an alien decision pending right now? |
 | `wait_for_alien_decision` | Block until it's the aliens' turn, then return the acting unit's situation (YAML). Times out during the human's turn — call again. |
+| `get_visible_map` | For the current alien: reachable tiles (+ TU), nearby units (allies/enemies), and hazards (fire/smoke). |
+| `check_action` | Ask whether a proposed action is legal and what it costs, *before* committing to it (reachability/TU/line-of-fire). |
 | `submit_alien_action` | Submit the action for the alien the engine is waiting on (`action_type` plus optional `target_x/y/z`, `weapon_id`, `waypoints`, `kneel`, `run`, `final_facing`). |
 | `get_sample_request` | A representative request payload (schema reference; standalone mock mode only). |
 
@@ -55,9 +57,9 @@ alien-AI API (the `rest-ai-server` branch).
    ```
 
 4. **Tell the LLM to play the aliens**, e.g.:
-   > "You are commanding the aliens. Call `wait_for_alien_decision`; when a unit needs orders, read
-   > its situation and call `submit_alien_action` with a sensible move or attack. Repeat until it's
-   > the human's turn again, then wait."
+   > "You are commanding the aliens. Loop: call `wait_for_alien_decision`; when a unit needs orders,
+   > use `get_visible_map` to see where it can move and who is nearby, `check_action` to confirm a
+   > move/shot is legal, then `submit_alien_action`. Repeat until it's the human's turn, then wait."
 
    The engine blocks (waiting) on each alien until the LLM answers, so play is turn-based and the
    LLM is never rushed.
@@ -71,10 +73,10 @@ The REST API is an **alien-decision** API, not full player parity:
   sequencing.
 - Supported actions: `WALK` (+`run`), `KNEEL`, `TURN`/`final_facing`, `SNAPSHOT`/`AUTOSHOT`/
   `AIMEDSHOT`, `THROW`, `HIT`, `USE`, `LAUNCH` (+waypoints), `MINDCONTROL`, `PANIC`, `NONE`.
-- **Partial observability:** the request contains the acting unit, its inventory, visible enemies
-  and the map size — but not the full map, reachable tiles, or valid fire solutions. The LLM must
-  infer legality; **illegal actions are ignored by the engine** (the unit simply idles), so expect
-  some wasted moves until the payload is enriched.
+- **Observability** comes from two live queries: `get_visible_map` (reachable tiles + TU, nearby
+  units, hazards) and `check_action` (validate a move/shot: reachability, TU, line-of-fire) before
+  committing. Illegal actions submitted anyway are ignored by the engine (the unit idles), so
+  validate first when unsure. The base request is still a curated view (no full terrain grid yet).
 
 See `../docs/REST_AI.md` for the full API and schemas.
 

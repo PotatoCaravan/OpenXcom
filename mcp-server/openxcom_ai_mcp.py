@@ -27,6 +27,27 @@ ACTION_TYPES = [
     "HIT", "USE", "LAUNCH", "MINDCONTROL", "PANIC", "KNEEL", "TURN",
 ]
 
+# Shared argument schema for the two action tools (submit_alien_action + check_action).
+ACTION_INPUT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "action_type": {"type": "string", "enum": ACTION_TYPES, "description": "The action to take."},
+        "target_x": {"type": "integer", "description": "Target tile X (with target_y/z)."},
+        "target_y": {"type": "integer", "description": "Target tile Y."},
+        "target_z": {"type": "integer", "description": "Target tile Z (level)."},
+        "weapon_id": {"type": "integer", "description": "BattleItem id from the unit's items; omit for main-hand weapon."},
+        "waypoints": {
+            "type": "array", "description": "Blaster-launch path for LAUNCH.",
+            "items": {"type": "object", "properties": {
+                "x": {"type": "integer"}, "y": {"type": "integer"}, "z": {"type": "integer"}}},
+        },
+        "final_facing": {"type": "integer", "description": "Direction (0-7) to face after moving; -1 = none."},
+        "kneel": {"type": "boolean"},
+        "run": {"type": "boolean"},
+    },
+    "required": ["action_type"],
+}
+
 
 def log(msg):
     # MCP uses stdout for the protocol, so all diagnostics MUST go to stderr.
@@ -67,6 +88,12 @@ class RestClient:
 
     def sample(self):
         return self._req("GET", "/sample-request")
+
+    def get_map(self):
+        return self._req("GET", "/map")
+
+    def validate(self, action_yaml):
+        return self._req("POST", "/validate", action_yaml)
 
     # Harness-only endpoints (standalone --restserver); used by the integration test.
     def publish(self, request_yaml):
@@ -153,6 +180,29 @@ def tool_submit_alien_action(client, args):
     return "Action POST failed (status %s): %s\nYAML sent was:\n%s" % (s, b, action_yaml)
 
 
+def tool_get_visible_map(client, _args):
+    s, b = client.get_map()
+    if s == 200:
+        return b
+    if s == 409:
+        return ("No alien decision is active right now (it is not the alien turn). "
+                "Call wait_for_alien_decision first.")
+    return "/map returned status %s: %s" % (s, b)
+
+
+def tool_check_action(client, args):
+    if not args.get("action_type"):
+        return "ERROR: action_type is required."
+    action_yaml = build_action_yaml(args)
+    s, b = client.validate(action_yaml)
+    if s == 200:
+        return b
+    if s == 409:
+        return ("No alien decision is active (not the alien turn). "
+                "Call wait_for_alien_decision first.")
+    return "/validate returned status %s: %s" % (s, b)
+
+
 def tool_get_sample_request(client, _args):
     s, b = client.sample()
     if s == 200:
@@ -189,36 +239,22 @@ TOOLS = {
         "description": "Submit the chosen action for the alien the engine is waiting on. Pick a "
                        "target/weapon consistent with the situation from wait_for_alien_decision. "
                        "NONE ends this unit's activation. Illegal actions are ignored by the engine.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "action_type": {
-                    "type": "string", "enum": ACTION_TYPES,
-                    "description": "The action to take.",
-                },
-                "target_x": {"type": "integer", "description": "Target tile X (with target_y/z)."},
-                "target_y": {"type": "integer", "description": "Target tile Y."},
-                "target_z": {"type": "integer", "description": "Target tile Z (level)."},
-                "weapon_id": {
-                    "type": "integer",
-                    "description": "BattleItem id from the unit's items; omit for the main-hand weapon.",
-                },
-                "waypoints": {
-                    "type": "array",
-                    "description": "Blaster-launch path for LAUNCH.",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "x": {"type": "integer"}, "y": {"type": "integer"}, "z": {"type": "integer"},
-                        },
-                    },
-                },
-                "final_facing": {"type": "integer", "description": "Direction (0-7) to face after moving; -1 = none."},
-                "kneel": {"type": "boolean"},
-                "run": {"type": "boolean"},
-            },
-            "required": ["action_type"],
-        },
+        "inputSchema": ACTION_INPUT_SCHEMA,
+    },
+    "get_visible_map": {
+        "fn": tool_get_visible_map,
+        "description": "For the alien currently being decided, get where it can move this turn "
+                       "(reachable tiles + TU), nearby units (allies/enemies with positions), and "
+                       "hazards (fire/smoke). Only valid during the alien turn.",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    "check_action": {
+        "fn": tool_check_action,
+        "description": "Ask the engine whether a proposed action for the current alien is legal and "
+                       "what it costs (reachability + TU for WALK; TU + line-of-fire for shots; "
+                       "throw validity). Same arguments as submit_alien_action -- use it to avoid "
+                       "wasting the unit's turn on an illegal move.",
+        "inputSchema": ACTION_INPUT_SCHEMA,
     },
     "get_sample_request": {
         "fn": tool_get_sample_request,

@@ -97,6 +97,12 @@ try {
         Check (($la.Status -eq 200) -and ($la.Body -match 'SNAPSHOT')) `
             "GET /last-action echoes the submitted action"
 
+        # Live-query endpoints exist and correctly refuse (409) when no alien decision is active
+        # (standalone --restserver has no battle running, so they always 409 here).
+        Check ((Req GET '/map').Status -eq 409) "GET /map is 409 when no decision is active"
+        Check ((Req POST '/validate' "action:`n  type: WALK`n").Status -eq 409) `
+            "POST /validate is 409 when no decision is active"
+
         # 6. Robustness: an unknown path 404s; a garbage action body is still accepted (parsing/
         #    validation happens later, on the game side, and degrades to idle).
         Check ((Req GET '/no-such-endpoint').Status -eq 404) "unknown path returns 404"
